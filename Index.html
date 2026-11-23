@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quran Word Catcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Noto+Naskh+Arabic:wght@400;600&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm, reverent, unhurried — a quiet study space at night
+   IDEA: an illuminated mushaf page; each word is a small lantern you place into the verse's gilded frame
+   PICTURE: dimmed mirrored camera under deep green-lapis, soft lantern-words, gold placeholders for the verse
+   COLOUR and TYPE: deep #0a1f24, gold #d9b25c, turquoise #3bb3a3; Amiri Quran for the text, Noto Naskh for Persian/Pashto, Inter for UI
+   LAYOUT: full-screen stage; HUD top; word card under it; verse placeholders along the bottom; menu and verse card centred */
+:root{--bg:#081a1e;--ink:#f3ead4;--gold:#d9b25c;--teal:#3bb3a3;--rose:#d9707f;--card:rgba(8,26,30,.94)}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tr,.ar,textarea{-webkit-user-select:text;user-select:text}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+#cam{position:fixed;width:2px;height:2px;opacity:0;pointer-events:none}
+#hud{position:fixed;top:0;left:0;right:0;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px max(3vw,12px);pointer-events:none;flex-wrap:wrap}
+#hud>*{pointer-events:auto}
+.tag{background:rgba(8,26,30,.75);border:1px solid rgba(217,178,92,.35);border-radius:999px;padding:6px 14px;font-size:14px;white-space:nowrap}
+.tag b{color:var(--gold);font-weight:600}
+.hudr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#status.ok{border-color:var(--teal)}#status.warn{border-color:var(--rose)}
+button,select{font:600 15px Inter,sans-serif;min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--gold);background:var(--gold);color:#1b1505;cursor:pointer}
+button.ghost{background:rgba(8,26,30,.75);color:var(--ink);border-color:rgba(217,178,92,.5)}
+button:disabled{opacity:.5;cursor:wait}
+select{background:rgba(0,0,0,.3);color:var(--ink);border-color:rgba(217,178,92,.5);font-weight:400;font-size:16px;width:100%}
+select option{background:#0d2a30}
+button:focus-visible,select:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+#wordCard{position:fixed;top:66px;left:50%;transform:translateX(-50%);min-width:220px;max-width:min(560px,92vw);background:rgba(8,26,30,.9);border:1px solid rgba(217,178,92,.55);border-radius:16px;padding:8px 18px 10px;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s}
+#wordCard.show{opacity:1}
+#wcAr{font:32px/1.9 'Amiri Quran',serif;color:var(--gold);direction:rtl}
+.wcRow{display:flex;gap:10px;justify-content:center;align-items:baseline;flex-wrap:wrap;font-size:16px}
+.wcRow small{color:#9fb5ad;font-size:12px}
+#wcFa{font:17px/1.7 'Noto Naskh Arabic',serif;direction:rtl}
+#toast{position:fixed;bottom:150px;left:50%;transform:translateX(-50%);background:rgba(8,26,30,.88);border:1px solid rgba(217,112,127,.6);padding:8px 18px;border-radius:12px;font-size:15px;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1}
+.panel{position:fixed;inset:0;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,rgba(14,52,58,.6),rgba(3,12,14,.88));overflow:auto}
+.panel.hidden{display:none}
+.card{width:min(780px,100%);background:var(--card);border:1px solid rgba(217,178,92,.4);border-radius:20px;padding:clamp(20px,4vw,36px);box-shadow:0 30px 80px rgba(0,0,0,.5);margin:auto}
+h1{margin:0;font-size:clamp(30px,5vw,44px);line-height:1.05;font-weight:800;text-wrap:balance}
+h1 span{display:block;font:clamp(24px,3.4vw,32px)/1.9 'Amiri Quran',serif;color:var(--gold);direction:rtl}
+.lead{color:#c6c9b8;margin:10px 0 18px;max-width:64ch}
+.grid2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px}
+label{display:block;font-size:13px;color:#9fb5ad;margin-bottom:4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;align-items:center}
+.credit{margin-top:16px;padding-top:14px;border-top:1px solid rgba(217,178,92,.2);font-size:14px}
+.credit b{color:var(--gold)}
+.credit p{font-size:12px;line-height:1.55;color:#93a69f;margin:6px 0 0}
+.credit p b{color:#c6c9b8}
+.note{font-size:13px;color:#93a69f;margin-top:14px}
+.key{text-align:center;color:var(--teal);font-weight:600}
+.ar{direction:rtl;font:clamp(24px,4vw,34px)/2.1 'Amiri Quran',serif;color:var(--gold);text-align:center;margin:6px 0 14px}
+.vw{cursor:pointer;border-radius:8px;padding:0 3px}.vw:hover{background:rgba(217,178,92,.15)}
+.tr{border-top:1px solid rgba(217,178,92,.18);padding:10px 0}
+.tr small{display:block;color:#93a69f;font-size:12px}
+.tr .rtl{direction:rtl;text-align:right;font:18px/1.9 'Noto Naskh Arabic',serif}
+#vTr{max-height:38vh;overflow:auto}
+#count{text-align:center;color:#93a69f;font-size:14px}
+.panel{z-index:10}
+.pop{position:fixed;top:64px;right:max(3vw,12px);z-index:20;width:min(380px,94vw);background:var(--card);border:1px solid rgba(217,178,92,.5);border-radius:18px;padding:16px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+.pop.hidden{display:none}
+.popHead{font-weight:800;font-size:18px;margin-bottom:10px}
+.popGroup{font-size:12px;color:#93a69f;margin:10px 0 6px}
+.popGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.popGrid button{background:rgba(255,255,255,.04);color:var(--ink);border-color:rgba(217,178,92,.3);font-weight:400;font-size:14px;padding:0 10px}
+.popGrid button[aria-pressed=true]{background:rgba(217,178,92,.18);border-color:var(--gold);font-weight:600}
+.popGrid button:disabled{opacity:.4;cursor:not-allowed}
+.popNote{font-size:12px;color:#93a69f;margin:10px 0}
+@media(max-width:600px){.grid2{grid-template-columns:1fr}.tag{font-size:13px;padding:5px 10px}#toast{bottom:120px}}
+@media(prefers-reduced-motion:reduce){#toast,#wordCard{transition:none}}
+</style>
+</head>
+<body>
+<video id="cam" playsinline muted></video>
+<canvas id="c"></canvas>
+
+<div id="hud" hidden>
+  <div class="tag" id="where"></div>
+  <div class="hudr">
+    <div class="tag" id="status">Mouse / touch</div>
+    <button class="ghost" id="reciteBtn" aria-pressed="true">Recitation on</button>
+    <button class="ghost bgOpen">Background</button>
+    <button class="ghost" id="hintBtn">Hint</button>
+    <button class="ghost" id="skipBtn">Skip verse</button>
+    <button class="ghost" id="menuBtn">Menu</button>
+  </div>
+</div>
+<div id="wordCard"><div id="wcAr"></div>
+  <div class="wcRow"><i id="wcTl" style="color:#9fd3c8"></i></div>
+  <div class="wcRow"><span id="wcEn"></span><small>English</small></div>
+  <div class="wcRow"><small>فارسی</small><span id="wcFa"></span></div>
+</div>
+<div id="toast"></div>
+
+<div class="pop hidden" id="bgPanel" role="dialog" aria-label="Background">
+  <div class="popHead">Background</div>
+  <div class="popGroup">Camera</div>
+  <div class="popGrid">
+    <button data-bg="full" class="camOpt">Full camera</button>
+    <button data-bg="blur" class="camOpt">Blurred camera</button>
+    <button data-bg="face" class="camOpt">Blur my face</button>
+    <button data-bg="upload">Upload image…</button>
+  </div>
+  <div class="popGroup">Scenes</div>
+  <div class="popGrid">
+    <button data-bg="mosque">Mosque at night</button>
+    <button data-bg="pattern">Geometric pattern</button>
+    <button data-bg="mihrab">Mihrab and lamp</button>
+    <button data-bg="desert">Desert crescent</button>
+  </div>
+  <p class="popNote" id="bgNote"></p>
+  <button id="bgClose">Done</button>
+</div>
+<input type="file" id="bgFile" accept="image/*" hidden>
+
+<div class="panel" id="menu">
+  <div class="card">
+    <h1>Quran Word Catcher<span>كَلِمَاتُ ٱلْقُرْآن</span></h1>
+    <p class="lead">Rebuild each verse word by word. Pinch your thumb and index finger to catch a word, then place it in the next empty frame at the bottom. Verses are built right to left. When you catch a word, you hear it recited and see its meaning in English and Persian. When you finish a verse, it is recited in full and appears whole with its English, Persian and Pashto translations.</p>
+    <div class="grid2">
+      <div><label for="surah">Surah</label><select id="surah"><option>Loading surahs…</option></select></div>
+      <div><label for="ayah">Verse</label><select id="ayah"></select></div>
+    </div>
+    <div class="row">
+      <button id="playCam" disabled>Play with camera</button>
+      <button class="ghost" id="playMouse" disabled>Play with mouse / touch</button>
+      <button class="ghost bgOpen">Background</button>
+    </div>
+    <p class="note" id="camNote">Requires an internet connection. Text and translations load from quran.com. Camera mode works best in Chrome. Allow camera access when asked. Your video stays on your device.</p>
+    <div class="credit"><b>Developed by: Massùod Hemmat</b>
+      <p><b>Disclaimer:</b> The Quran text, word-by-word meanings and translations in this app come from third-party sources (quran.com, Tanzil/QuranEnc, Saheeh International, Hussein Taji Kal Dari and Zakaria Abulsalam). They are provided as they are, for learning only. A translation conveys meaning and is not the Quran itself. The developer is not responsible for any errors, omissions or inaccuracies in the text, translations or data, or for any unforeseen problems arising from use of this app. Please check with an authoritative printed mushaf or a qualified scholar.</p>
+    </div>
+  </div>
+</div>
+
+<div class="panel hidden" id="done">
+  <div class="card">
+    <div class="key" id="vKey"></div>
+    <div class="ar" id="vAr"></div>
+    <div id="vTr"></div>
+    <div class="row" style="justify-content:center">
+      <button class="ghost" id="verseBtn">Play verse recitation</button>
+      <button id="nextBtn">Next verse</button>
+      <button class="ghost" id="againBtn">Replay verse</button>
+      <button class="ghost" id="menuBtn2">Menu</button>
+    </div>
+    <p class="note" id="count"></p>
+    <p class="note" style="text-align:center;margin-top:4px">Developed by: Massùod Hemmat · Translations are from third-party sources and may contain errors.</p>
+  </div>
+</div>
+
+<script type="module">
+{
+const API='https://api.quran.com/api/v4';
+const SRC={en:'Saheeh International',fa:'Hussein Taji Kal Dari',ps:'Zakaria Abulsalam',wbw:'quran.com word-by-word'};
+const $=s=>document.querySelector(s);
+const cv=$('#c'),ctx=cv.getContext('2d'),video=$('#cam');
+const AR='"Amiri Quran", "Noto Naskh Arabic", serif';
+let W=0,H=0,DPR=1,chapters=[],surah=1,ayah=1,verse=null,rounds=[],roundIdx=0;
+let words=[],slots=[],slotBand={y:0,h:0},fly={x:0,y:0,w:0,h:0},nextSlot=0,fontPx=34,pad=18;
+let state='menu',mode='mouse',landmarker=null,wrong=0,hintT=0,celebT=0,doneTimer=null,loading=false;
+const cache=new Map(),parts=[];
+const V='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+let bgMode='mosque',bgImg=null,bgCache={},faceDet=null,faceLoading=false,faces=[],lastFaceT=-1e9,lastFaceRun=0;
+try{bgMode=localStorage.getItem('qwc-bg')||'mosque';if(bgMode==='upload')bgMode='mosque'}catch(e){}
+const hands=[0,1,2].map(()=>({sx:0,sy:0,seen:false,pinch:false,held:null,miss:0,tips:null}));
+const stars=Array.from({length:110},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.3+.2,p:Math.random()*6}));
+const HUES=[44,172,30,190,52,160];
+const clean=t=>(t||'').replace(/<sup[^>]*>.*?<\/sup>/gi,'').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
+
+/* ---------- data ---------- */
+async function getJSON(u){const r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+async function loadChapters(){
+  try{
+    const d=await getJSON(API+'/chapters?language=en');chapters=d.chapters;
+    $('#surah').innerHTML=chapters.map(c=>`<option value="${c.id}">${c.id}. ${c.name_simple} — ${c.name_arabic} (${c.verses_count})</option>`).join('');
+    try{const s=JSON.parse(localStorage.getItem('qwc-pos')||'null');if(s){surah=s.surah;ayah=s.ayah}}catch(e){}
+    $('#surah').value=surah;fillAyahs();$('#ayah').value=ayah;
+    $('#playCam').disabled=false;$('#playMouse').disabled=false;
+  }catch(e){$('#surah').innerHTML='<option>Could not load — check your internet</option>';$('#camNote').textContent='Could not reach quran.com ('+e.message+'). Check your connection and reload the page.'}
+}
+function fillAyahs(){const c=chapters[surah-1];$('#ayah').innerHTML=Array.from({length:c.verses_count},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('')}
+$('#surah').onchange=e=>{surah=+e.target.value;ayah=1;fillAyahs()};
+$('#ayah').onchange=e=>{ayah=+e.target.value};
+function fetchVerse(s,a){
+  const k=s+':'+a;if(cache.has(k))return cache.get(k);
+  const base=`${API}/verses/by_key/${k}?words=true&word_fields=text_uthmani`;
+  const p=Promise.all([getJSON(base+'&language=en&translations=20,118'),getJSON(base+'&language=fa&translations=29')]).then(([en,fa])=>{
+    const we=en.verse.words.filter(w=>w.char_type_name==='word'),wf=fa.verse.words.filter(w=>w.char_type_name==='word');
+    const tr=id=>(en.verse.translations||[]).concat(fa.verse.translations||[]).find(t=>t.resource_id===id);
+    return {key:k,s,a,
+      words:we.map((w,i)=>({pos:i,ar:(w.text_uthmani||'').replace(/[\u06D6-\u06DC]/g,''),tl:clean(w.transliteration&&w.transliteration.text),en:clean(w.translation&&w.translation.text),fa:clean(wf[i]&&wf[i].translation&&wf[i].translation.text)})),
+      en:clean(tr(20)&&tr(20).text),fa:clean(tr(29)&&tr(29).text),ps:clean(tr(118)&&tr(118).text)};
+  });
+  p.catch(()=>cache.delete(k));cache.set(k,p);return p;
+}
+function nextKey(s,a){const c=chapters[s-1];if(a<c.verses_count)return[s,a+1];return s<114?[s+1,1]:[1,1]}
+
+/* ---------- audio ---------- */
+let ac=null;const SCALE=[293.66,329.63,349.23,392,440,466.16,523.25,587.33,659.25,698.46];
+function audio(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==='suspended')ac.resume()}
+function tone(f,t0=0,dur=1.2,vol=.14,type='sine'){if(!ac)return;const t=ac.currentTime+t0,o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(ac.destination);o.start(t);o.stop(t+dur+.05)}
+const chime=n=>{const f=SCALE[n%SCALE.length];tone(f);tone(f*2,0,.5,.03)};
+const soft=()=>{tone(196,0,.35,.08,'triangle');tone(185,.08,.4,.06,'triangle')};
+const finish=()=>[0,2,4,7].forEach((k,i)=>tone(SCALE[k],i*.14,1.8,.11));
+
+/* ---------- word recitation (quran.com word-by-word audio, streamed) ---------- */
+const SILENT="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";const reciter=new Audio();reciter.preload='auto';let reciteOn=true,audioUnlocked=false;
+try{reciteOn=localStorage.getItem('qwc-recite')!=='off'}catch(e){}
+const p3=n=>String(n).padStart(3,'0');
+const wordURL=(s,a,pos)=>`https://audio.qurancdn.com/wbw/${p3(s)}_${p3(a)}_${p3(pos+1)}.mp3`;
+function unlockAudio(){if(audioUnlocked)return;audioUnlocked=true;try{verseAudio.src=SILENT;const q=verseAudio.play();if(q)q.catch(()=>{})}catch(e){}try{reciter.src="data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";const p=reciter.play();if(p)p.catch(()=>{})}catch(e){}}
+function recite(d,s,a){if(!reciteOn||!d||d.pos==null)return;
+  try{verseAudio.pause();setVerseBtn(false);reciter.pause();reciter.src=wordURL(s||verse.s,a||verse.a,d.pos);const p=reciter.play();if(p)p.catch(()=>{if(!navigator.onLine)toast('Recitation needs internet')})}catch(e){}}
+reciter.addEventListener('error',()=>{if(reciteOn&&reciter.src.startsWith('http'))toast(navigator.onLine?'Recitation for this word is not available':'Recitation needs internet')});
+function syncRecite(){const b=$('#reciteBtn');b.textContent=reciteOn?'Recitation on':'Recitation off';b.setAttribute('aria-pressed',String(reciteOn))}
+$('#reciteBtn').onclick=()=>{reciteOn=!reciteOn;try{localStorage.setItem('qwc-recite',reciteOn?'on':'off')}catch(e){}syncRecite();if(!reciteOn){reciter.pause();stopVerse()}};
+syncRecite();
+
+/* ---------- full-verse recitation (quran.com, Mishary Alafasy) ---------- */
+const verseAudio=new Audio();verseAudio.preload='auto';
+const verseURL=(s,a)=>`https://verses.quran.com/Alafasy/mp3/${p3(s)}${p3(a)}.mp3`;
+function setVerseBtn(playing){const b=$('#verseBtn');if(b)b.textContent=playing?'Stop recitation':'Play verse recitation'}
+function playVerse(onEnd){
+  reciter.pause();verseAudio.pause();verseAudio.onended=verseAudio.onerror=null;
+  const fin=()=>{setVerseBtn(false);if(onEnd){const f=onEnd;onEnd=null;f()}};
+  verseAudio.onended=fin;verseAudio.onerror=()=>{if(verseAudio.src.startsWith('http'))toast(navigator.onLine?'Verse recitation not available':'Verse recitation needs internet');fin()};
+  try{verseAudio.src=verseURL(verse.s,verse.a);setVerseBtn(true);const pr=verseAudio.play();if(pr)pr.catch(()=>fin())}catch(e){fin()}
+}
+function stopVerse(){verseAudio.pause();verseAudio.onended=verseAudio.onerror=null;setVerseBtn(false)}
+
+/* ---------- flow ---------- */
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),1900)}
+async function loadAndStart(){
+  loading=true;state='loading';words=[];slots=[];updateWhere(true);
+  try{verse=await fetchVerse(surah,ayah)}catch(e){loading=false;state='error';toast('Could not load verse — check internet');return}
+  loading=false;
+  try{localStorage.setItem('qwc-pos',JSON.stringify({surah,ayah}))}catch(e){}
+  const n=verse.words.length,CH=W<700?5:8,k=Math.ceil(n/CH),size=Math.ceil(n/k);
+  rounds=[];for(let i=0;i<n;i+=size)rounds.push(verse.words.slice(i,i+size));
+  roundIdx=0;startRound();
+  const [ns,na]=nextKey(surah,ayah);fetchVerse(ns,na).catch(()=>{});
+}
+function startRound(){
+  const r=rounds[roundIdx];nextSlot=0;wrong=0;hintT=0;state='play';
+  words=r.map((d,i)=>({d,t:d.ar,i,x:0,y:0,vx:0,vy:0,dir:Math.random()*6.28,ph:Math.random()*6,st:'fly',w:60,h:40,t2:0,hue:HUES[i%HUES.length],slot:-1}));
+  layout();
+  for(const w of words){w.x=fly.x+w.w/2+Math.random()*Math.max(1,fly.w-w.w);w.y=fly.y+w.h/2+Math.random()*Math.max(1,fly.h-w.h)}
+  updateWhere();
+}
+function updateWhere(isLoading){const c=chapters[surah-1];
+  $('#where').innerHTML=`<b>${c?c.name_simple:''} ${surah}:${ayah}</b>`+(isLoading?' · loading…':rounds.length>1?` · part ${roundIdx+1} of ${rounds.length}`:'')}
+function layout(){
+  const r=rounds[roundIdx];if(!r||!words.length)return;
+  fontPx=Math.max(18,Math.min(38,W/17));let widths,total,gap;
+  for(let k=0;k<14;k++){pad=fontPx*.55;gap=fontPx*.35;ctx.font=`${fontPx}px ${AR}`;ctx.direction='rtl';
+    widths=r.map(w=>ctx.measureText(w.ar).width+pad*2);total=widths.reduce((a,b)=>a+b,0)+gap*(widths.length-1);
+    if(total<=W*.95)break;fontPx*=.9}
+  const h=fontPx*2.1,y=H-h-Math.max(22,H*.05);let x=(W-total)/2;const n=widths.length;
+  slots=new Array(n);for(let i=n-1;i>=0;i--){slots[i]={x,y,w:widths[i],h};x+=widths[i]+gap}
+  slotBand={y:y-h*1.1,h:h*2.6};
+  ctx.font=`${fontPx}px ${AR}`;for(const w of words){w.w=ctx.measureText(w.t).width+pad*2;w.h=h}
+  const top=Math.min(H*.32,200);fly={x:16,y:top,w:W-32,h:Math.max(90,slotBand.y-top-10)};
+}
+function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);bgCache={};layout()}
+addEventListener('resize',resize);resize();
+
+function nearest(h,R){let best=null,bd=R;for(const w of words){if(w.st==='placed'||w.st==='held')continue;
+  const d=Math.hypot(w.x-h.sx,w.y-h.sy)-Math.min(w.w/2,50);if(d<bd){bd=d;best=w}}return best}
+function pinchStart(h){if(state!=='play')return;const w=nearest(h,Math.max(70,fontPx*2.6));if(w){w.st='held';h.held=w;recite(w.d);return}
+  const pw=words.find(x=>x.st==='placed'&&Math.abs(x.x-h.sx)<x.w/2&&Math.abs(x.y-h.sy)<x.h*.45);if(pw)recite(pw.d)}
+function pinchEnd(h){
+  const w=h.held;h.held=null;if(!w)return;const r=rounds[roundIdx];
+  if(state==='play'&&h.sy>slotBand.y&&h.sy<slotBand.y+slotBand.h){
+    if(w.t===r[nextSlot].ar){w.st='placed';w.slot=nextSlot;const s=slots[nextSlot];burst(s.x+s.w/2,s.y+s.h/2,'#d9b25c',16);chime(nextSlot);nextSlot++;hintT=0;
+      if(nextSlot>=r.length){state='celebrate';celebT=0}}
+    else{w.st='flee';w.t2=.9;w.vx=(Math.random()-.5)*500;w.vy=-300-Math.random()*200;soft();wrong++;
+      toast(wrong>=3?'Tip: press Hint, and the next word will glow':'Not this word yet — it drifted back')}
+  }else w.st='fly';
+}
+function hint(){if(state!=='play')return;hintT=4;toast('The glowing word comes next')}
+function burst(x,y,col,n){for(let i=0;i<n;i++){const a=Math.random()*6.28,s=60+Math.random()*200;parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-50,life:1,col})}}
+
+function trBlock(label,src,text,rtl){if(!text)return'';const d=document.createElement('div');d.className='tr';
+  const sm=document.createElement('small');sm.textContent=`${label} — ${src}`;const p=document.createElement('div');if(rtl)p.className='rtl';p.textContent=text;d.append(sm,p);return d}
+function showDone(){
+  state='done';finish();$('#wordCard').classList.remove('show');
+  const c=chapters[surah-1];$('#vKey').textContent=`${c.name_simple} (${c.name_arabic}) · ${surah}:${ayah}`;
+  const va=$('#vAr');va.innerHTML='';verse.words.forEach(w=>{const sp=document.createElement('span');sp.className='vw';sp.textContent=w.ar;sp.title=w.en;sp.onclick=()=>recite(w);va.appendChild(sp);va.append(' ')});
+  const t=$('#vTr');t.innerHTML='';
+  for(const b of [trBlock('English',SRC.en,verse.en),trBlock('Persian (Dari)',SRC.fa,verse.fa,true),trBlock('Pashto',SRC.ps,verse.ps,true)])if(b)t.appendChild(b);
+  $('#done').classList.remove('hidden');clearInterval(doneTimer);$('#count').textContent='';
+  const countdown=()=>{if(mode!=='camera'||state!=='done')return;clearInterval(doneTimer);let s=10;$('#count').textContent=`Next verse in ${s}s`;doneTimer=setInterval(()=>{s--;$('#count').textContent=`Next verse in ${s}s`;if(s<=0)nextVerse()},1000)};
+  if(reciteOn){$('#count').textContent=mode==='camera'?'Listening to the recitation…':'';playVerse(countdown)}else countdown();
+}
+function nextVerse(){stopVerse();clearInterval(doneTimer);$('#done').classList.add('hidden');[surah,ayah]=nextKey(surah,ayah);loadAndStart()}
+$('#nextBtn').onclick=nextVerse;
+$('#verseBtn').onclick=()=>{if(!verseAudio.paused&&verseAudio.src.startsWith('http')){stopVerse()}else{clearInterval(doneTimer);$('#count').textContent='';playVerse()}};
+$('#againBtn').onclick=()=>{stopVerse();clearInterval(doneTimer);$('#done').classList.add('hidden');loadAndStart()};
+$('#skipBtn').onclick=()=>{if(state==='play'||state==='error')nextVerse()};
+function toMenu(){stopVerse();clearInterval(doneTimer);state='menu';$('#done').classList.add('hidden');$('#menu').classList.remove('hidden');$('#hud').hidden=true;$('#wordCard').classList.remove('show');
+  if(chapters.length){$('#surah').value=surah;fillAyahs();$('#ayah').value=ayah}}
+$('#menuBtn').onclick=toMenu;$('#menuBtn2').onclick=toMenu;$('#hintBtn').onclick=hint;
+
+async function begin(m){
+  audio();unlockAudio();try{await document.fonts.load(`32px "Amiri Quran"`)}catch(e){}
+  mode=m;if(m==='camera'&&!landmarker){if(!await initCamera())mode='mouse'}
+  if(bgMode==='face')ensureFaceDet();syncBgPanel();
+  $('#menu').classList.add('hidden');$('#hud').hidden=false;
+  setStatus(mode==='camera'?'Show your hand':'Mouse / touch',mode==='camera'?'warn':'');
+  loadAndStart();
+}
+$('#playCam').onclick=()=>begin('camera');$('#playMouse').onclick=()=>begin('mouse');
+function setStatus(t,cls){const s=$('#status');s.textContent=t;s.className='tag '+(cls||'')}
+
+/* ---------- camera + hands ---------- */
+async function initCamera(){
+  const note=$('#camNote'),btn=$('#playCam');btn.disabled=true;btn.textContent='Loading hand tracker…';
+  try{
+    const vision=await import(V);const fs=await vision.FilesetResolver.forVisionTasks(V+'/wasm');
+    const opts=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:d},runningMode:'VIDEO',numHands:2});
+    try{landmarker=await vision.HandLandmarker.createFromOptions(fs,opts('GPU'))}catch(e){landmarker=await vision.HandLandmarker.createFromOptions(fs,opts('CPU'))}
+    btn.textContent='Starting camera…';
+    const stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'},audio:false});
+    video.srcObject=stream;await video.play();btn.disabled=false;btn.textContent='Play with camera';return true;
+  }catch(e){console.error(e);landmarker=null;btn.disabled=false;btn.textContent='Play with camera';
+    note.textContent='The camera or hand tracker could not start ('+(e.name||'error')+'). Check camera permission and your connection. Mouse / touch still works.';
+    toast('Camera unavailable — using mouse / touch');return false}
+}
+function cover(){const vw=video.videoWidth||1280,vh=video.videoHeight||720,s=Math.max(W/vw,H/vh);return{vw,vh,s,dx:(W-vw*s)/2,dy:(H-vh*s)/2}}
+function toScreen(p,c){return{x:W-(p.x*c.vw*c.s+c.dx),y:p.y*c.vh*c.s+c.dy}}
+function detect(dt){
+  if(video.readyState<2)return;let res;try{res=landmarker.detectForVideo(video,performance.now())}catch(e){return}
+  const c=cover();
+  const det=(res.landmarks||[]).map(lm=>{const t=toScreen(lm[4],c),i=toScreen(lm[8],c),wr=toScreen(lm[0],c),m=toScreen(lm[9],c);
+    const span=Math.hypot(wr.x-m.x,wr.y-m.y)||1;return{x:(t.x+i.x)/2,y:(t.y+i.y)/2,d:Math.hypot(t.x-i.x,t.y-i.y)/span,t,i}});
+  const used=[false,false];
+  for(const d of det){let best=-1,bd=Infinity;
+    for(let k=0;k<2;k++){if(used[k])continue;const h=hands[k];const dd=h.seen?Math.hypot(h.sx-d.x,h.sy-d.y):1e7+k;if(dd<bd){bd=dd;best=k}}
+    if(best<0)continue;used[best]=true;const h=hands[best];
+    h.miss=0;if(!h.seen){h.sx=d.x;h.sy=d.y}h.seen=true;h.sx+=(d.x-h.sx)*.55;h.sy+=(d.y-h.sy)*.55;h.tips=[d.t,d.i];
+    if(!h.pinch&&d.d<.33){h.pinch=true;pinchStart(h)}else if(h.pinch&&d.d>.5){h.pinch=false;pinchEnd(h)}}
+  for(let k=0;k<2;k++){const h=hands[k];if(used[k])continue;h.miss+=dt;if(h.seen&&h.miss>.35){h.seen=false;if(h.pinch){h.pinch=false;pinchEnd(h)}}}
+  const any=hands[0].seen||hands[1].seen;
+  setStatus(any?(hands[0].seen&&hands[1].seen?'Two hands found':'Hand found'):'Show your hand',any?'ok':'warn');
+}
+const mh=hands[2];
+cv.addEventListener('pointerdown',e=>{audio();unlockAudio();mh.sx=e.clientX;mh.sy=e.clientY;mh.seen=true;mh.pinch=true;pinchStart(mh);cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{mh.sx=e.clientX;mh.sy=e.clientY;mh.seen=true});
+const up=()=>{if(mh.pinch){mh.pinch=false;pinchEnd(mh)}};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);cv.addEventListener('pointerleave',()=>{if(!mh.pinch)mh.seen=false});
+
+/* ---------- word card ---------- */
+let cardWord=null;
+function updateCard(){
+  let w=null;
+  for(const h of hands)if(h.held){w=h.held;break}
+  if(!w&&state==='play')for(const h of hands){if(!h.seen)continue;const n=nearest(h,40);if(n){w=n;break}}
+  if(w===cardWord)return;cardWord=w;const c=$('#wordCard');
+  if(!w){c.classList.remove('show');return}
+  $('#wcAr').textContent=w.d.ar;$('#wcTl').textContent=w.d.tl||'';$('#wcEn').textContent=w.d.en||'—';$('#wcFa').textContent=w.d.fa||'—';c.classList.add('show');
+}
+
+/* ---------- update / draw ---------- */
+function update(dt){
+  for(const w of words){const hw=w.w/2,hh=w.h/2;
+    if(w.st==='fly'||w.st==='flee'){w.ph+=dt*2;
+      if(w.st==='fly'){w.dir+=(Math.random()-.5)*dt*4;const sp=32;w.vx+=(Math.cos(w.dir)*sp-w.vx)*Math.min(1,dt*1.2);w.vy+=(Math.sin(w.dir)*sp-w.vy)*Math.min(1,dt*1.2)}
+      else{const k=Math.pow(.1,dt);w.vx*=k;w.vy*=k;w.t2-=dt;if(w.t2<=0)w.st='fly'}
+      w.x+=w.vx*dt;w.y+=w.vy*dt;
+      const x0=fly.x+hw,x1=Math.max(x0,fly.x+fly.w-hw),y0=fly.y+hh,y1=Math.max(y0,fly.y+fly.h-hh);
+      if(w.x<x0){w.x=x0;w.vx=Math.abs(w.vx);w.dir=Math.PI-w.dir}if(w.x>x1){w.x=x1;w.vx=-Math.abs(w.vx);w.dir=Math.PI-w.dir}
+      if(w.y<y0){w.y=y0;w.vy=Math.abs(w.vy);w.dir=-w.dir}if(w.y>y1){w.y=y1;w.vy=-Math.abs(w.vy);w.dir=-w.dir}
+    }else if(w.st==='held'){const h=hands.find(h=>h.held===w);if(h){const k=Math.min(1,dt*18);w.x+=(h.sx-w.x)*k;w.y+=(h.sy-w.y)*k}}
+    else if(w.st==='placed'){const s=slots[w.slot];const k=Math.min(1,dt*10);w.x+=(s.x+s.w/2-w.x)*k;w.y+=(s.y+s.h/2-w.y)*k}
+  }
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=240*dt;p.life-=dt*1.1;if(p.life<=0)parts.splice(i,1)}
+  if(hintT>0)hintT-=dt;
+  if(state==='celebrate'){celebT+=dt;if(celebT>1.6){if(roundIdx<rounds.length-1){roundIdx++;startRound()}else showDone()}}
+  updateCard();
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h)}
+/* ---------- backgrounds ---------- */
+const sm=document.createElement('canvas'),smx=sm.getContext('2d'),fm=document.createElement('canvas'),fmx=fm.getContext('2d');
+function lowRes(cnv,cx,w){const vw=video.videoWidth||1280,vh=video.videoHeight||720;cnv.width=w;cnv.height=Math.max(1,Math.round(w*vh/vw));cx.drawImage(video,0,0,cnv.width,cnv.height);return cnv}
+function camOK(){return mode==='camera'&&!!landmarker&&video.readyState>=2}
+function effectiveBg(){if(['full','blur','face'].includes(bgMode)&&!camOK())return 'mosque';if(bgMode==='upload'&&!bgImg)return 'mosque';return bgMode}
+function drawBg(now){
+  const m=effectiveBg();
+  if(m==='full'||m==='blur'||m==='face'){
+    const c=cover(),dw=c.vw*c.s,dh=c.vh*c.s;ctx.save();ctx.translate(W,0);ctx.scale(-1,1);ctx.imageSmoothingEnabled=true;
+    const faceReady=m==='face'&&faceDet&&now-lastFaceT<600;
+    if(m==='blur'||(m==='face'&&!faceReady))ctx.drawImage(lowRes(sm,smx,56),c.dx,c.dy,dw,dh);
+    else{ctx.drawImage(video,c.dx,c.dy,dw,dh);
+      if(m==='face'){lowRes(fm,fmx,18);
+        for(const f of faces){ctx.save();ctx.beginPath();
+          ctx.ellipse(c.dx+(f.x+f.w/2)*c.s,c.dy+(f.y+f.h/2)*c.s,f.w*c.s*.72,f.h*c.s*.72,0,0,6.28);ctx.clip();
+          ctx.drawImage(fm,c.dx,c.dy,dw,dh);ctx.restore()}}}
+    ctx.restore();ctx.fillStyle=`rgba(6,22,26,${m==='full'?.42:.48})`;ctx.fillRect(0,0,W,H);return;
+  }
+  if(m==='upload'){const iw=bgImg.width,ih=bgImg.height,s=Math.max(W/iw,H/ih);
+    ctx.drawImage(bgImg,(W-iw*s)/2,(H-ih*s)/2,iw*s,ih*s);ctx.fillStyle='rgba(6,22,26,.45)';ctx.fillRect(0,0,W,H);return}
+  if(!bgCache[m])bgCache[m]=renderScene(m);
+  ctx.drawImage(bgCache[m],0,0,W,H);
+  if(m==='mosque'||m==='desert'){for(const s of stars){ctx.globalAlpha=.25+.35*Math.sin(now/1100+s.p);ctx.fillStyle='#f3ead4';ctx.beginPath();ctx.arc(s.x*W,s.y*H*.5,s.r,0,6.28);ctx.fill()}ctx.globalAlpha=1}
+  if(m==='mihrab'){const lx=W/2,ly=H*.36,g=ctx.createRadialGradient(lx,ly,0,lx,ly,Math.min(W,H)*.32);
+    g.addColorStop(0,`rgba(255,210,120,${.2+.05*Math.sin(now/500)})`);g.addColorStop(1,'rgba(255,210,120,0)');ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
+}
+function renderScene(m){
+  const o=document.createElement('canvas');o.width=W*DPR;o.height=H*DPR;const g=o.getContext('2d');g.scale(DPR,DPR);
+  const S=Math.min(W,H),gold='#d9b25c';
+  const sky=(a,b)=>{const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,a);gr.addColorStop(1,b);g.fillStyle=gr;g.fillRect(0,0,W,H);return gr};
+  const moon=(x,y,r,gr)=>{g.fillStyle='#f1d58a';g.shadowColor='rgba(241,213,138,.6)';g.shadowBlur=30;g.beginPath();g.arc(x,y,r,0,6.28);g.fill();g.shadowBlur=0;g.fillStyle=gr;g.beginPath();g.arc(x+r*.38,y-r*.12,r*.86,0,6.28);g.fill()};
+  if(m==='mosque'){
+    const gr=sky('#0a2a3a','#0c3a3c');moon(W*.8,H*.17,S*.06,gr);
+    const base=H*.8,R=S*.17,cx=W/2;g.fillStyle='#03100f';
+    g.fillRect(cx-R*1.5,base-R*.9,R*3,R*.9);
+    g.beginPath();g.moveTo(cx-R,base-R*.9);g.bezierCurveTo(cx-R*1.15,base-R*2,cx-R*.2,base-R*2.2,cx,base-R*2.5);
+    g.bezierCurveTo(cx+R*.2,base-R*2.2,cx+R*1.15,base-R*2,cx+R,base-R*.9);g.fill();
+    g.fillRect(cx-1.5,base-R*2.85,3,R*.4);
+    for(const s of[-1,1]){const dx=cx+s*R*1.15;g.beginPath();g.arc(dx,base-R*.9,R*.42,Math.PI,0);g.fill();
+      const mx=cx+s*R*2.1,mw=R*.22;g.fillRect(mx-mw/2,base-R*3,mw,R*3);g.fillRect(mx-mw*.8,base-R*2.2,mw*1.6,R*.1);
+      g.beginPath();g.moveTo(mx-mw/2,base-R*3);g.lineTo(mx,base-R*3.5);g.lineTo(mx+mw/2,base-R*3);g.fill()}
+    g.fillRect(0,base,W,H-base);
+    g.fillStyle='rgba(217,178,92,.55)';for(let i=-2;i<=2;i++){const wx=cx+i*R*.5;g.beginPath();g.moveTo(wx-R*.1,base-R*.15);g.lineTo(wx-R*.1,base-R*.5);g.arc(wx,base-R*.5,R*.1,Math.PI,0);g.lineTo(wx+R*.1,base-R*.15);g.fill()}
+  }else if(m==='pattern'){
+    const gr=g.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.7);gr.addColorStop(0,'#10403c');gr.addColorStop(1,'#051a19');g.fillStyle=gr;g.fillRect(0,0,W,H);
+    const t=S/6,r=t*.42;g.strokeStyle='rgba(217,178,92,.28)';g.lineWidth=1.2;
+    for(let y=0;y<=H+t;y+=t)for(let x=0;x<=W+t;x+=t){
+      for(const a of[0,Math.PI/4]){g.beginPath();for(let k=0;k<4;k++){const an=a+k*Math.PI/2;g[k?'lineTo':'moveTo'](x+Math.cos(an)*r,y+Math.sin(an)*r)}g.closePath();g.stroke()}
+      g.beginPath();g.arc(x,y,r*.35,0,6.28);g.stroke();
+      g.beginPath();g.moveTo(x+r,y);g.lineTo(x+t-r,y);g.moveTo(x,y+r);g.lineTo(x,y+t-r);g.stroke()}
+    const v=g.createRadialGradient(W/2,H/2,S*.2,W/2,H/2,Math.max(W,H)*.75);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.55)');g.fillStyle=v;g.fillRect(0,0,W,H);
+  }else if(m==='mihrab'){
+    sky('#0f2a26','#081614');
+    const aw=Math.min(W*.62,S*.9),ax=W/2,bot=H,top=H*.08,sh=(bot-top)*.55;
+    const arch=(w,inset)=>{const l=ax-w/2+inset,r=ax+w/2-inset,sy=top+sh+inset,ty=top+inset;
+      g.beginPath();g.moveTo(l,bot);g.lineTo(l,sy);g.quadraticCurveTo(l,ty+ (sy-ty)*.25,ax,ty);g.quadraticCurveTo(r,ty+(sy-ty)*.25,r,sy);g.lineTo(r,bot)};
+    arch(aw,0);g.fillStyle='#0b1f1c';g.fill();
+    for(let i=0;i<4;i++){arch(aw,i*S*.022);g.strokeStyle=`rgba(217,178,92,${.55-i*.11})`;g.lineWidth=i?1.2:2.5;g.stroke()}
+    arch(aw,S*.09);g.fillStyle='#061311';g.fill();
+    const lx=ax,ly=H*.36;g.strokeStyle='rgba(217,178,92,.6)';g.lineWidth=1.2;g.beginPath();g.moveTo(lx,top+S*.06);g.lineTo(lx,ly-S*.05);g.stroke();
+    g.fillStyle=gold;g.beginPath();g.moveTo(lx-S*.05,ly-S*.04);g.lineTo(lx+S*.05,ly-S*.04);g.lineTo(lx+S*.03,ly+S*.04);g.lineTo(lx-S*.03,ly+S*.04);g.closePath();g.fill();
+    g.fillStyle='#ffe2a0';g.beginPath();g.arc(lx,ly,S*.018,0,6.28);g.fill();
+  }else if(m==='desert'){
+    const gr=sky('#0b1430','#3a2a48');moon(W*.25,H*.2,S*.07,gr);
+    const dune=(y0,amp,col,ph)=>{g.fillStyle=col;g.beginPath();g.moveTo(0,H);g.lineTo(0,y0);
+      for(let x=0;x<=W;x+=W/40)g.lineTo(x,y0-Math.sin(x/W*Math.PI*1.6+ph)*amp);g.lineTo(W,H);g.fill()};
+    dune(H*.68,H*.05,'#2a1c2c',0);dune(H*.76,H*.06,'#1c1220',2);dune(H*.86,H*.04,'#100a12',4);
+    const px=W*.78,py=H*.8,ph=S*.22;g.strokeStyle='#0a060b';g.lineWidth=S*.012;g.lineCap='round';
+    g.beginPath();g.moveTo(px,py);g.quadraticCurveTo(px+S*.02,py-ph*.5,px-S*.01,py-ph);g.stroke();
+    g.fillStyle='#0a060b';for(let k=0;k<6;k++){const a=-Math.PI*.95+k*Math.PI*.18;g.beginPath();g.ellipse(px-S*.01+Math.cos(a)*S*.06,py-ph+Math.sin(a)*S*.035,S*.07,S*.014,a,0,6.28);g.fill()}
+  }
+  return o;
+}
+async function ensureFaceDet(){
+  if(faceDet||faceLoading||!landmarker)return;faceLoading=true;
+  try{const vision=await import(V);const fs=await vision.FilesetResolver.forVisionTasks(V+'/wasm');
+    const o=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',delegate:d},runningMode:'VIDEO',minDetectionConfidence:.4});
+    try{faceDet=await vision.FaceDetector.createFromOptions(fs,o('GPU'))}catch(e){faceDet=await vision.FaceDetector.createFromOptions(fs,o('CPU'))}
+  }catch(e){console.error(e);toast('Face blur unavailable — the whole camera stays blurred')}
+  faceLoading=false;
+}
+function detectFaces(now){
+  if(bgMode!=='face'||!faceDet||video.readyState<2||now-lastFaceRun<90)return;lastFaceRun=now;
+  try{const r=faceDet.detectForVideo(video,now);
+    if(r.detections&&r.detections.length){faces=r.detections.map(d=>{const b=d.boundingBox;return{x:b.originX-b.width*.2,y:b.originY-b.height*.45,w:b.width*1.4,h:b.height*1.7}});lastFaceT=now}
+  }catch(e){}
+}
+function setBg(m){
+  if(m==='upload'){$('#bgFile').click();return}
+  bgMode=m;try{localStorage.setItem('qwc-bg',m)}catch(e){}
+  if(m==='face')ensureFaceDet();
+  syncBgPanel();
+}
+function syncBgPanel(){
+  for(const b of document.querySelectorAll('#bgPanel [data-bg]')){b.setAttribute('aria-pressed',String(b.dataset.bg===bgMode));
+    if(b.classList.contains('camOpt'))b.disabled=!landmarker}
+  $('#bgNote').textContent=landmarker?'Blur my face hides only your face and blurs everything if it loses track of you. Your camera stays on your device.':'Camera backgrounds work after you start “Play with camera”. Scenes and uploads work in any mode.';
+}
+for(const b of document.querySelectorAll('.bgOpen'))b.onclick=()=>{syncBgPanel();$('#bgPanel').classList.toggle('hidden')};
+$('#bgClose').onclick=()=>$('#bgPanel').classList.add('hidden');
+$('#bgPanel').addEventListener('click',e=>{const b=e.target.closest('[data-bg]');if(b)setBg(b.dataset.bg)});
+$('#bgFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const img=new Image();
+  img.onload=()=>{bgImg=img;bgMode='upload';syncBgPanel()};img.onerror=()=>toast('That image could not be opened');img.src=URL.createObjectURL(f);e.target.value=''};
+function drawSlots(now){
+  if(!slots.length)return;
+  if(state==='celebrate'){const a=Math.min(1,celebT*2),y=slots[0].y+slots[0].h/2,g=ctx.createRadialGradient(W/2,y,0,W/2,y,W*.6);
+    g.addColorStop(0,`rgba(217,178,92,${.25*a})`);g.addColorStop(1,'rgba(217,178,92,0)');ctx.fillStyle=g;ctx.fillRect(0,slotBand.y-60,W,slotBand.h+120)}
+  ctx.lineWidth=1.5;
+  slots.forEach((s,i)=>{if(i<nextSlot)return;const cur=i===nextSlot&&state==='play',pulse=cur?.55+.45*Math.sin(now/300):.32;
+    ctx.setLineDash(cur?[]:[6,6]);ctx.strokeStyle=`rgba(217,178,92,${pulse})`;ctx.fillStyle=cur?'rgba(217,178,92,.08)':'rgba(255,255,255,.03)';
+    rr(s.x,s.y+s.h*.1,s.w,s.h*.8,s.h*.25);ctx.fill();ctx.stroke()});
+  ctx.setLineDash([]);
+  if(hands.some(h=>h.held)&&state==='play'){ctx.fillStyle='rgba(243,234,212,.7)';ctx.font=`400 ${Math.max(13,fontPx*.38)}px Inter`;ctx.textAlign='center';ctx.direction='ltr';ctx.fillText('Place here',W/2,slotBand.y+6)}
+}
+function drawWord(w,now){
+  const bob=w.st==='fly'?Math.sin(w.ph)*4:0,x=w.x,y=w.y+bob,ph=w.h*.8;
+  const r=rounds[roundIdx],isHint=hintT>0&&w.st!=='placed'&&r&&r[nextSlot]&&w.t===r[nextSlot].ar;
+  ctx.save();ctx.translate(x,y);
+  if(w.st!=='placed'){const R=Math.max(w.w*.7,w.h),g=ctx.createRadialGradient(0,0,0,0,0,R);
+    const a=.22+.08*Math.sin(now/700+w.i);g.addColorStop(0,`hsla(${w.hue},70%,60%,${a})`);g.addColorStop(1,`hsla(${w.hue},70%,60%,0)`);ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,R,0,6.28);ctx.fill()}
+  if(isHint||w.st==='held'){ctx.shadowColor=isHint?'#3bb3a3':'#d9b25c';ctx.shadowBlur=22+(isHint?10*Math.sin(now/140):0)}
+  ctx.fillStyle=w.st==='placed'?'rgba(217,178,92,.15)':'rgba(8,26,30,.9)';
+  ctx.strokeStyle=w.st==='held'?'#d9b25c':isHint?'#3bb3a3':w.st==='placed'?'rgba(217,178,92,.85)':'rgba(217,178,92,.45)';
+  ctx.lineWidth=w.st==='held'||isHint?2.5:1.3;rr(-w.w/2,-ph/2,w.w,ph,ph*.32);ctx.fill();ctx.shadowBlur=0;ctx.stroke();
+  ctx.fillStyle=w.st==='placed'?'#ffe6a8':'#f3ead4';ctx.font=`${fontPx}px ${AR}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.direction='rtl';
+  ctx.fillText(w.t,0,fontPx*.12);ctx.restore();
+}
+function drawHands(){
+  if(mode!=='camera')return;
+  for(const h of hands.slice(0,2)){if(!h.seen)continue;
+    if(h.tips){ctx.strokeStyle='rgba(59,179,163,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(h.tips[0].x,h.tips[0].y);ctx.lineTo(h.tips[1].x,h.tips[1].y);ctx.stroke();
+      ctx.fillStyle='#3bb3a3';for(const t of h.tips){ctx.beginPath();ctx.arc(t.x,t.y,5,0,6.28);ctx.fill()}}
+    ctx.beginPath();ctx.arc(h.sx,h.sy,h.pinch?11:16,0,6.28);ctx.lineWidth=3;ctx.strokeStyle=h.pinch?'#d9b25c':'rgba(243,234,212,.85)';ctx.stroke();
+    if(h.pinch){ctx.fillStyle='rgba(217,178,92,.5)';ctx.fill()}}
+}
+function draw(now){
+  ctx.clearRect(0,0,W,H);drawBg(now);
+  if(state==='loading'){ctx.fillStyle='rgba(243,234,212,.75)';ctx.font='500 18px Inter';ctx.textAlign='center';ctx.direction='ltr';ctx.fillText('Loading verse…',W/2,H/2)}
+  if(state==='error'){ctx.fillStyle='rgba(243,234,212,.8)';ctx.font='500 18px Inter';ctx.textAlign='center';ctx.direction='ltr';ctx.fillText('Could not load this verse. Check your internet, then press Skip verse or Menu.',W/2,H/2)}
+  if(['play','celebrate','done'].includes(state)){drawSlots(now);
+    for(const w of words)if(w.st==='placed')drawWord(w,now);
+    for(const w of words)if(w.st!=='placed'&&w.st!=='held')drawWord(w,now);
+    for(const w of words)if(w.st==='held')drawWord(w,now)}
+  for(const p of parts){ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(p.x,p.y,2.3,0,6.28);ctx.fill()}
+  ctx.globalAlpha=1;drawHands();
+}
+let last=performance.now();
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(mode==='camera'&&landmarker&&state!=='menu')detect(dt);if(mode==='camera'&&landmarker)detectFaces(now);update(dt);draw(now);requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+loadChapters();
+}
+</script>
+</body>
+</html>
